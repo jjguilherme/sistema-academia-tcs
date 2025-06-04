@@ -1,32 +1,27 @@
-# app.py
 import streamlit as st
 import streamlit_pills as stp
 import pandas as pd
 from src import database
 from datetime import date, timedelta
-# from src import database # Mantenha para suas funções de BD
-
-import streamlit_authenticator as stauth # Biblioteca de autenticação
+import streamlit_authenticator as stauth
 import yaml
-from yaml.loader import SafeLoader # Para carregar o YAML de forma segura
+from yaml.loader import SafeLoader
 
 conn = database.conectar_bd() 
 
-# --- Configuração da Página (DEVE SER A PRIMEIRA CHAMADA DO STREAMLIT) ---
 st.set_page_config(
     page_title="Sistema Academia",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# --- 1. Carregar Configurações do Autenticador ---
 try:
-    with open('config.yaml', 'r', encoding='utf-8') as file: # Adicionado encoding='utf-8'
+    with open('config.yaml', 'r', encoding='utf-8') as file:
         config = yaml.load(file, Loader=SafeLoader)
 except FileNotFoundError:
     st.error("ERRO CRÍTICO: Arquivo de configuração 'config.yaml' não encontrado. "
              "Crie este arquivo no mesmo diretório do app.py conforme a documentação.")
-    st.stop() # Impede a execução do restante do script
+    st.stop()
 except Exception as e:
     st.error(f"Erro ao carregar o arquivo config.yaml: {e}")
     st.stop()
@@ -36,41 +31,30 @@ authenticator = stauth.Authenticate(
     config['cookie']['name'],
     config['cookie']['key'],
     config['cookie']['expiry_days']
-    # config.get('preauthorized') # Use config.get se 'preauthorized' for opcional
 )
 
-# --- Inicialização de variáveis de estado da sessão específicas do app ---
 if "pagina_selecionada" not in st.session_state:
     st.session_state.pagina_selecionada = "Dashboard"
-# 'role_usuario' será definido após o login bem-sucedido
 
-# --- Interface de Login ---
-# O authenticator.login() gerencia o estado de autenticação internamente
-# e define st.session_state["authentication_status"], st.session_state["name"], st.session_state["username"]
-authenticator.login() # 'main' é o padrão para localização do formulário
+authenticator.login()
 
 if st.session_state["authentication_status"]:
-    # --- USUÁRIO AUTENTICADO ---
-
-    # Buscar e definir o papel do usuário no session_state
     try:
         user_logged_in = st.session_state["username"]
-        st.session_state.role_usuario = config['credentials']['usernames'][user_logged_in].get('role', 'user') # Default para 'user'
+        st.session_state.role_usuario = config['credentials']['usernames'][user_logged_in].get('role', 'user')
     except KeyError:
         st.error("Não foi possível determinar o papel do usuário. Contate o administrador.")
-        st.session_state.role_usuario = 'user' # Papel padrão em caso de erro
+        st.session_state.role_usuario = 'user'
 
-    # Botão de Logout e informações do usuário na Sidebar
     with st.sidebar:
-        st.write(f"Bem-vindo(a), **{st.session_state['name']}**!") # 'name' vem do config.yaml
+        st.write(f"Bem-vindo(a), **{st.session_state['name']}**!")
         sidebar_caption = f"Usuário: {st.session_state['username']}"
-        if st.session_state.get("role_usuario"): # Verifica se role_usuario existe
+        if st.session_state.get("role_usuario"):
             sidebar_caption += f" (Papel: {st.session_state.role_usuario.capitalize()})"
         st.caption(sidebar_caption)
-        authenticator.logout("Sair", key="logout_button_sidebar") # 'key' é importante
+        authenticator.logout("Sair", key="logout_button_sidebar")
         st.markdown("---")
 
-    # --- Menu de Navegação com Pills (Área Principal) ---
     opcoes_menu_base = ["Dashboard", "Clientes", "Treinos", "Pagamentos"]
     icones_menu_base = ["🏠", "👥", "🏋️", "💳"]
     
@@ -81,17 +65,16 @@ if st.session_state["authentication_status"]:
         opcoes_menu_pills = opcoes_menu_base
         icones_menu_pills = icones_menu_base
     
-    # Lógica para manter a pill selecionada (ou ir para Dashboard como padrão)
     current_page_in_options = st.session_state.pagina_selecionada in opcoes_menu_pills
-    if not current_page_in_options and opcoes_menu_pills: # Se a página salva não é válida (ex: admin deslogou)
-        st.session_state.pagina_selecionada = opcoes_menu_pills[0] # Volta para a primeira opção (Dashboard)
+    if not current_page_in_options and opcoes_menu_pills:
+        st.session_state.pagina_selecionada = opcoes_menu_pills[0]
         default_index = 0
     elif opcoes_menu_pills:
          default_index = opcoes_menu_pills.index(st.session_state.pagina_selecionada)
-    else: # Caso raro de não haver opções
+    else:
         default_index = 0
 
-    if opcoes_menu_pills: # Só mostra pills se houver opções
+    if opcoes_menu_pills:
         pagina_atual = stp.pills(
             label="Navegação Principal:",
             options=opcoes_menu_pills,
@@ -101,9 +84,7 @@ if st.session_state["authentication_status"]:
         )
         st.session_state.pagina_selecionada = pagina_atual
     else:
-        pagina_atual = None # Nenhuma página para mostrar
-
-    # --- Conteúdo da Página Selecionada ---
+        pagina_atual = None
     
     if pagina_atual == "Dashboard":
         st.title("🏠 Dashboard")
@@ -113,22 +94,18 @@ if st.session_state["authentication_status"]:
         dados_planos = database.count_clientes_por_plano()
         totalpago = database.count_pagamentosn()
 
-            # Definindo o estilo do card
         col1, col2 = st.columns(2)
-        # Construir a lista de planos em HTML para dentro do card
+
         lista_html_interna = ""
         if dados_planos:
-            lista_html_interna += "<ul style='list-style-type: none; padding-top: 8px; padding-left: 20px; margin: 0; text-align: left;'>" # Corrigido pading_top e adicionado padding-left
+            lista_html_interna += "<ul style='list-style-type: none; padding-top: 8px; padding-left: 20px; margin: 0; text-align: left;'>"
             for item in dados_planos:
-                lista_html_interna += f"<li style='color: white; margin-bottom: 5px; font-size: 1em;'><strong>{item['nome_plano']}:</strong> {item['total_clientes']} ativos</li>" # Ajustado margin e font-size
+                lista_html_interna += f"<li style='color: white; margin-bottom: 5px; font-size: 1em;'><strong>{item['nome_plano']}:</strong> {item['total_clientes']} ativos</li>"
             lista_html_interna += "</ul>"
         else:
             lista_html_interna = "<p style='color: white; text-align: center;'>Nenhum dado de plano encontrado.</p>"
 
-# Criando as colunas para os dois primeiros cards
         col1, col2, col3 = st.columns(3)
-            # Card para Clientes por Plano
-            
             
         with col1:
                 card_clientes = f"""
@@ -165,8 +142,6 @@ if st.session_state["authentication_status"]:
                 </div>
                 """
                 st.markdown(card_instrutores, unsafe_allow_html=True)
-            # Card para Clientes por Plano
-        
         
         with col3:
 
@@ -210,9 +185,9 @@ if st.session_state["authentication_status"]:
         st.title("👨‍💻 Gestão de Clientes")
         st.markdown("Gerencie os clientes da sua academia: visualize, adicione e veja seus planos.")
 
-        tab_selecionada = st.radio("Escolha uma opção", ["Lista de Clientes", "Cadastrar Novo Cliente"])
+        tab_listar, tab_cadastrar_cliente = st.tabs(["Listar clientes", "Cadastrar novo cliente"])
 
-        if tab_selecionada == "Lista de Clientes":
+        with tab_listar:
             st.header("Lista de Clientes e Seus Planos")
 
             clientes_info = database.get_clients_with_current_plan_info()
@@ -242,7 +217,7 @@ if st.session_state["authentication_status"]:
             else:
                 st.info("Nenhum cliente cadastrado ainda.")
 
-        if tab_selecionada == "Cadastrar Novo Cliente":
+        with tab_cadastrar_cliente:
             st.header("Cadastrar Novo Cliente")
 
             with st.form("form_cadastro_cliente", clear_on_submit=True):
@@ -327,7 +302,6 @@ if st.session_state["authentication_status"]:
         with tab_visualizar:
             st.subheader("Consultar Treinos Existentes")
             try:
-                # Carregar dados para filtros
                 clientes_select_filtro = database.get_all_clients_for_select()
                 instrutores_select_filtro = database.get_all_instructors_for_select()
 
@@ -350,7 +324,6 @@ if st.session_state["authentication_status"]:
                 cliente_id_para_filtro = opcoes_clientes_filtro.get(cliente_filtro_nome_sel)
                 instrutor_id_para_filtro = opcoes_instrutores_filtro.get(instrutor_filtro_nome_sel)
 
-                # Buscar treinos com base nos filtros
                 treinos_encontrados_data = database.get_workouts_with_exercises(
                     cliente_id=cliente_id_para_filtro, 
                     instrutor_id=instrutor_id_para_filtro
@@ -387,7 +360,7 @@ if st.session_state["authentication_status"]:
             st.markdown("---")
             st.subheader("Clientes Ativos por Instrutor")
             try:
-                instrutor_clientes_data = database.get_active_client_count_per_instructor() # Passa conn implicitamente
+                instrutor_clientes_data = database.get_active_client_count_per_instructor()
                 if instrutor_clientes_data:
                     df_instrutor_clientes = pd.DataFrame(instrutor_clientes_data)
                     col_instr_cli_display = ['instrutor_nome', 'instrutor_especialidade', 'numero_clientes_ativos']
@@ -402,7 +375,6 @@ if st.session_state["authentication_status"]:
         with tab_cadastrar_treino_exercicios:
             st.subheader("Cadastrar Novo Treino e Adicionar Exercícios")
 
-            # Passo 1: Dados do Treino Principal
             with st.form("form_dados_treino_principal_multi_tab", clear_on_submit=False):
                 st.markdown("##### 1. Detalhes do Treino Principal")
                 form_nome_t_p_val = st.text_input("Nome do Treino*", key="form_nome_t_p_multi_val")
@@ -518,14 +490,13 @@ if st.session_state["authentication_status"]:
                         novo_treino_id_db = database.add_treino(
                         dados_treino_principal_final['nome_treino'],
                         dados_treino_principal_final['data_inicio'],
-                        cliente_id=dados_treino_principal_final.get('cliente_id'), # Exemplo, ajuste conforme seus dados
-                        instrutor_id=dados_treino_principal_final.get('instrutor_id'), # Exemplo
-                        plano_id=dados_treino_principal_final.get('plano_id'), # Exemplo
-                        data_fim=dados_treino_principal_final.get('data_fim'), # Exemplo
-                        objetivo=dados_treino_principal_final.get('objetivo'), # Exemplo
-                        tipo_treino=dados_treino_principal_final.get('tipo_treino'), # Exemplo
+                        cliente_id=dados_treino_principal_final.get('cliente_id'),
+                        instrutor_id=dados_treino_principal_final.get('instrutor_id'),
+                        plano_id=dados_treino_principal_final.get('plano_id'),
+                        data_fim=dados_treino_principal_final.get('data_fim'),
+                        objetivo=dados_treino_principal_final.get('objetivo'),
+                        tipo_treino=dados_treino_principal_final.get('tipo_treino'),
                         descricao_treino=dados_treino_principal_final.get('descricao_treino')
-                        # Remova a linha: conn_externa=conn
                         )
                         if novo_treino_id_db:
                             todos_ex_salvos_final_db = True
@@ -534,18 +505,18 @@ if st.session_state["authentication_status"]:
                                     novo_treino_id_db,
                                     ex_info_final_db['exercicio_id'],
                                     ex_info_final_db['series'],
-                                    ex_info_final_db['repeticoes'], # Certifique-se de que todos os argumentos posicionais e nomeados estão corretos
+                                    ex_info_final_db['repeticoes'],
                                     ex_info_final_db['carga'],
                                     ex_info_final_db['descanso_segundos'],
                                     ex_info_final_db['ordem'],
-                                    ex_info_final_db['observacoes_exercicio']
-                                    
-                            )
+                                    ex_info_final_db['observacoes_exercicio']                                    
+                                )
+                                
                                 if res_add_ex_final_db is None: 
                                     todos_ex_salvos_final_db = False
                                     st.error(f"Falha ao salvar o exercício '{ex_info_final_db['nome_exercicio']}' no treino ID {novo_treino_id_db}.")
                                     break
-                            
+    
                             if todos_ex_salvos_final_db:
                                 st.success(f"Treino '{dados_treino_principal_final['nome_treino']}' e seus exercícios salvos com ID: {novo_treino_id_db}!")
                                 st.session_state.exercicios_para_treino_atual = []
@@ -663,7 +634,6 @@ if st.session_state["authentication_status"]:
 
 elif st.session_state["authentication_status"] is False:
     st.error('Nome de usuário/senha incorretos.')
-    # O formulário de login já está visível acima por padrão
+
 elif st.session_state["authentication_status"] is None:
     st.warning('Por favor, insira seu nome de usuário e senha para acessar o sistema.')
-    # O formulário de login já está visível acima por padrão
